@@ -20,7 +20,7 @@ publish `AckermannDrive` msg to `"/ackermann_cmd"`
 
 ```
 AckermannDrive
-float32 steering_angle                      # desired steering angle in radians
+float32 steering_angle                      # desired steering angle in degrees
 float32 steering_angle_velocity             # unused
 float32 speed                               # desired speed in kph
 float32 acceleration                        # set value between 0 ~ -1.0 to set brakes

@@ -112,7 +112,7 @@ class ERP42:
         if accel < 0:
             brake = accel * -200
         else:
-            brake = 1
+            brake = 0
 
         self.brake = brake
 

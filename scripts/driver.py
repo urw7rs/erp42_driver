@@ -62,8 +62,8 @@ class Node:
         msg.gear = gear_map[state.gear]
 
         msg.brake = state.brake
-        msg.speed = int(state.speed / 10)
-        msg.steer = -int(state.steer / 71)
+        msg.speed = state.speed / 10
+        msg.steer = -state.steer / 71
         msg.enc = state.enc
         msg.alive = state.alive
 

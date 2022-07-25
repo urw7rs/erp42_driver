@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import math
 import time
 
 import rospy
@@ -62,8 +61,8 @@ class Node:
         msg.gear = gear_map[state.gear]
 
         msg.brake = state.brake
-        msg.speed = state.speed / 10 * 3.6
-        msg.steer = math.radians(state.steer / 71)
+        msg.speed = state.speed / 10
+        msg.steer = state.steer / 71
         msg.enc = state.enc
         msg.alive = state.alive
 

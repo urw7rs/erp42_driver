@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import math
 import time
 from serial import SerialException
 
@@ -62,8 +63,8 @@ class Node:
         msg.gear = gear_map[state.gear]
 
         msg.brake = state.brake
-        msg.speed = int(state.speed / 10)
-        msg.steer = -int(state.steer / 71)
+        msg.speed = int(state.speed / 10 * 3.6)
+        msg.steer = int(math.radians(state.steer / 71))
         msg.enc = state.enc
         msg.alive = state.alive
 
@@ -98,5 +99,4 @@ if __name__ == "__main__":
         except Exception as e:
             rospy.logwarn("Unexpected Error: %s", e)
 
-            time.sleep(1.0)
-            continue
+            raise e

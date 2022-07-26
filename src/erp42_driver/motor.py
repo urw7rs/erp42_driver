@@ -20,7 +20,7 @@ State = namedtuple("State", "mode e_stop gear speed steer brake enc alive")
 
 class ERP42Serial:
     def __init__(self, port_name, baud):
-        self.port = Serial(port_name, baudrate=baud, timeout=1.0)
+        self.port = Serial(port_name, baudrate=baud)
 
     def read(self):
         line = self.port.readline()

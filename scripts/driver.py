@@ -61,8 +61,8 @@ class Node:
         msg.gear = gear_map[state.gear]
 
         msg.brake = state.brake
-        msg.speed = state.speed / 10
-        msg.steer = state.steer / 71
+        msg.speed = float(state.speed) / 10
+        msg.steer = float(state.steer) / 71
         msg.enc = state.enc
         msg.alive = state.alive
 
@@ -77,5 +77,8 @@ if __name__ == "__main__":
     rospy.loginfo("Connecting to %s" % (port_name))
 
     node = Node(port_name)
+    rospy.loginfo("Connected to %s" % (port_name))
     while not rospy.is_shutdown():
         node.run()
+
+    node.erp.close()

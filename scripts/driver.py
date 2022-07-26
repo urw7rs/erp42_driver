@@ -2,6 +2,8 @@
 
 import time
 
+from serial import SerialException
+
 import rospy
 
 from ackermann_msgs.msg import AckermannDrive
@@ -73,10 +75,14 @@ if __name__ == "__main__":
     rospy.init_node("driver_node")
     rospy.loginfo("ERP42 driver Node")
 
-    port_name = rospy.get_param("port", "/dev/ttyUSB0")
-    rospy.loginfo("Connecting to %s" % (port_name))
+    while not rospy.is_shutdown():
+        port_name = rospy.get_param("port", "/dev/ttyUSB0")
+        rospy.loginfo("Connecting to %s" % (port_name))
+        try:
+            node = Node(port_name)
+        except SerialException as e:
+            rospy.loginfo("Serial exception: %s" % (e))
 
-    node = Node(port_name)
     rospy.loginfo("Connected to %s" % (port_name))
     while not rospy.is_shutdown():
         node.run()

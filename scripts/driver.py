@@ -2,7 +2,6 @@
 
 import math
 import time
-from serial import SerialException
 
 import rospy
 
@@ -63,8 +62,8 @@ class Node:
         msg.gear = gear_map[state.gear]
 
         msg.brake = state.brake
-        msg.speed = int(state.speed / 10 * 3.6)
-        msg.steer = int(math.radians(state.steer / 71))
+        msg.speed = state.speed / 10 * 3.6
+        msg.steer = math.radians(state.steer / 71)
         msg.enc = state.enc
         msg.alive = state.alive
 
@@ -75,28 +74,9 @@ if __name__ == "__main__":
     rospy.init_node("driver_node")
     rospy.loginfo("ERP42 driver Node")
 
+    port_name = rospy.get_param("port", "/dev/ttyUSB0")
+    rospy.loginfo("Connecting to %s" % (port_name))
+
+    node = Node(port_name)
     while not rospy.is_shutdown():
-        port_name = rospy.get_param("port", "/dev/ttyUSB0")
-        rospy.loginfo("Connecting to %s" % (port_name))
-
-        try:
-            node = Node(port_name)
-            while not rospy.is_shutdown():
-                node.run()
-
-        except KeyboardInterrupt:
-            break
-
-        except SerialException as e:
-            rospy.logwarn("Serial exception: %s", e)
-            time.sleep(1.0)
-            continue
-
-        except OSError:
-            time.sleep(1.0)
-            continue
-
-        except Exception as e:
-            rospy.logwarn("Unexpected Error: %s", e)
-
-            raise e
+        node.run()

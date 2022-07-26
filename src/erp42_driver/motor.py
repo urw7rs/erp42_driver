@@ -1,3 +1,4 @@
+import math
 import time
 import struct
 
@@ -89,9 +90,9 @@ class ERP42:
         else:
             self.gear = gear
 
-    def set_speed(self, speed):
+    def set_speed(self, meters_per_sec):
         """set speed in kph"""
-        speed *= 10
+        speed = meters_per_sec * 3.6 * 10
 
         if speed < 0:
             speed = -speed
@@ -100,12 +101,15 @@ class ERP42:
         if speed > 0:
             gear = FORWARD
 
+        if speed == 0:
+            gear = NEUTRAL
+
         self.set_gear(gear)
         self.speed = speed
 
-    def set_steer(self, steer):
-        """set steering angle in degrees"""
-        self.steer = steer * 71
+    def set_steer(self, radians):
+        """set steering angle in radians"""
+        self.steer = math.degrees(radians) * 71
 
     def set_accel(self, accel):
         """adjust brake percentage according to accel"""
@@ -126,7 +130,7 @@ class ERP42:
         self.port.write(
             int(self.gear),
             int(self.speed),
-            int(self.steer),
+            int(-self.steer),
             int(self.brake),
             int(self.state.alive),
         )

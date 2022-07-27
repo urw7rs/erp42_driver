@@ -54,7 +54,7 @@ class Node:
 
 
 if __name__ == "__main__":
-    rospy.init_node("driver_node", log_level=rospy.DEBUG)
+    rospy.init_node("erp42_driver", log_level=rospy.DEBUG)
     rospy.loginfo("ERP42 driver Node")
 
     while not rospy.is_shutdown():

@@ -1,10 +1,7 @@
 import math
 import time
-import struct
-import logging
 
-from serial import Serial
-from collections import namedtuple
+from erp42_driver.utils import ERP42Serial
 
 MANUAL = 0
 AUTO = 1
@@ -15,105 +12,6 @@ ESTOP_ON = 1
 FORWARD = 0
 NEUTRAL = 1
 REVERSE = 2
-
-
-State = namedtuple(
-    "State", "auto_mode e_stop gear speed steer brake enc alive raw valid"
-)
-
-
-class ERP42Serial:
-    """
-    class representing serial port of ERP42
-
-    Args:
-        port_name (str): serial port name
-        baud (int): serial port baudrate, default is 115200 according to ERP42 docs
-
-    """
-
-    def __init__(self, port_name, baud):
-        self.port = Serial(port_name, baudrate=baud)
-
-    def read(self):
-        """
-        Read single data packet from ERP42 via uart
-
-        Returns:
-            (State): State tuple containing auto mode, e_stop, gear,
-                     speed, steer, brake, enc, alive values with
-                     raw line and valid flag
-
-                     Sets valid flag to false if read packet isn't valid
-        """
-
-        line = self.port.readline()
-
-        # return None if length doesn't match
-        if len(line) != 18:
-            logging.warning("Read packet is invalid, skipping read: %s", line)
-            valid = False
-
-            data = [0] * 8
-        else:
-            valid = True
-
-            data = struct.unpack(
-                "<BBBhhBiB",
-                line[3:16],
-            )
-
-        auto_mode, e_stop, gear, speed, steer, brake, enc, alive = data
-
-        return State(
-            auto_mode=auto_mode,
-            e_stop=e_stop,
-            gear=gear,
-            speed=speed,
-            steer=steer,
-            brake=brake,
-            enc=enc,
-            alive=alive,
-            raw=line,
-            valid=valid,
-        )
-
-    def write(self, gear, speed, steer, brake, alive):
-        """
-        Writes gear, speed, steer, brake, alive value to ERP42
-
-        Creates a command packet from arguments and sends it via uart
-        """
-
-        if alive < 255:
-            alive += 1
-        else:
-            alive = 0
-
-        self.port.write(
-            struct.pack(
-                ">BBBBBBhhBBBB",
-                0x53,
-                0x54,
-                0x58,
-                AUTO,
-                ESTOP_OFF,
-                gear,
-                speed,
-                steer,
-                brake,
-                alive,
-                0x0D,
-                0x0A,
-            )
-        )
-
-    def close(self):
-        """
-        Closes serial port
-        """
-
-        self.port.close()
 
 
 mode_map = {
@@ -131,10 +29,18 @@ gear_map = {
 }
 
 
+def to_kph(mps):
+    return mps * 3.6
+
+
+def to_mps(kph):
+    return kph / 3.6
+
+
 class ERP42Driver:
-    """
-    Driver for ERP42, implements methods to set
-    gear, speed, brake, steer with safety checks
+    """Driver for ERP42.
+
+    Implements methods to set gear, speed, brake, steer with safety checks
 
     Tracks ERP42 state in self.state and tracks desired state in
     self.gear, self.speed, self.brake, self.steer
@@ -150,21 +56,15 @@ class ERP42Driver:
     def __init__(self, port_name):
         self.port = ERP42Serial(port_name, 115200)
 
-        self.state = State(0, 0, 0, 0, 0, 0, 0, 0, "", False)
-
-        self.gear = 0
-        self.speed = 0
-        self.brake = 1
-        self.steer = 0
+        self.state = self.port.read()
 
         self.set_gear(NEUTRAL)
-        self.set_speed(0.0)
+        self.set_vel(0.0)
         self.set_steer(0.0)
         self.set_accel(0.0)
 
     def get_auto_mode(self, state=None):
-        """
-        Gets current mode and converts to text
+        """Gets current mode and converts to text
 
         Args:
             state (State): Optional state to convert
@@ -178,8 +78,7 @@ class ERP42Driver:
         return mode_map[state.auto_mode]
 
     def get_e_stop(self, state=None):
-        """
-        Gets current E-Stop mode and converts to text
+        """Gets current E-Stop mode and converts to text
 
         Args:
             state (State): Optional state to convert
@@ -193,8 +92,7 @@ class ERP42Driver:
         return e_stop_map[state.e_stop]
 
     def get_gear(self, state=None):
-        """
-        Gets current gear as text
+        """Gets current gear as text
 
         Args:
             state (State): Optional state to convert
@@ -207,19 +105,8 @@ class ERP42Driver:
             state = self.state
         return gear_map[state.gear]
 
-    def get_raw_gear(self):
-        """
-        Gets current raw gear value
-
-        Returns:
-            (int): gear value defined in the protocol
-        """
-
-        return self.state.gear
-
     def set_gear(self, gear):
-        """
-        Sets gear, mostly used internally
+        """Sets gear, mostly used internally
 
         Prevents users from changing gears in the opposite direction,
         e.g. changing to reverse when going forwards.
@@ -241,29 +128,49 @@ class ERP42Driver:
         else:
             self.gear = gear
 
-    def get_speed(self, speed):
-        gear = self.state.gear
-        speed = self.state.speed
+    def get_vel(self, state=None, unit="m/s"):
+        """Gets current gear as text
+
+        Args:
+            state (State): Optional state to convert
+
+        Returns:
+            (str): current gear as text
+        """
+
+        if state is None:
+            state = self.state
+
+        gear = state.gear
+        speed = state.speed
+
+        if unit == "m/s":
+            speed = to_mps(speed)
+        elif unit != "km/h":
+            raise NotImplementedError
+
         if gear == REVERSE:
             return -speed
         else:
             return speed
 
-    def set_speed(self, speed):
-        """
-        Sets speed in meters per second
+    def set_vel(self, vel, unit="km/h"):
+        """Sets vel in meters per second
 
         Sets internal speed and gear value according to the ERP42 protocol o
         which accepts only positive speed values coupled with gear value.
 
         Args:
-            speed (float): speed in m/s
+            vel (float): vel in m/s
         """
 
-        # convert to km/h
-        speed = speed * 3.6 * 10
+        if unit == "m/s":
+            vel = to_kph(vel)
+        elif unit != "km/h":
+            raise NotImplementedError
 
-        # remove direction in speed and put it in gear value
+        # convert velocity to speed and gear
+        speed = vel
         if speed < 0:
             speed = -speed
             gear = REVERSE
@@ -278,27 +185,32 @@ class ERP42Driver:
         self.speed = speed
         self.set_gear(gear)
 
-    def get_radians_steer(self):
-        """
-        Get steering angle in radians
+    def get_steer(self, state=None, unit="rad"):
+        """Get steering angle in radians
+
+        Args:
+            unit (str): unit to return steering angle in, "rad" or "deg"
+
         Returns:
             (float): steering angle in radians
+
+        Raises:
+            NotImplementedError: if unit is undefined
         """
 
-        return math.radians(self.state.steer / 71)
+        if state is None:
+            state = self.state
 
-    def get_degrees_steer(self):
-        """
-        Get steering angle in radians
-        Returns:
-            (float): steering angle in radians
-        """
+        degrees = state.steer
+        if unit == "rad":
+            return math.radians(degrees)
+        elif unit == "deg":
+            return degrees
+        else:
+            raise NotImplementedError
 
-        return math.radians(self.state.steer / 71)
-
-    def set_steer(self, angle):
-        """
-        Set steering angle in radians
+    def set_steer(self, angle, unit="rad"):
+        """Set steering angle in radians
 
         Converts steering angle to ERP42 protocol format: angles * 71
 
@@ -307,14 +219,18 @@ class ERP42Driver:
                 steering angle in radians, right is positive, left is negative
         """
 
-        self.steer = math.degrees(angle) * 71
+        if unit == "rad":
+            self.steer = math.degrees(angle)
+        elif unit == "deg":
+            self.steer = angle
+        else:
+            raise NotImplementedError
 
     def get_accel(self):
         raise NotImplementedError
 
     def set_accel(self, accel):
-        """
-        Adjust brake percentage according to acceleration
+        """Adjust brake percentage according to acceleration
 
         Brake values aren't calculated to match acceleration
 
@@ -352,7 +268,8 @@ class ERP42Driver:
         return self.state
 
     def sync(self):
-        """
+        """Reads and writes to ERP42Serial
+
         Synchronize class state with ERP42 state by reading states and sending
         command using internal state via the serial port
 
@@ -365,18 +282,17 @@ class ERP42Driver:
             self.state = data
 
         self.port.write(
-            int(self.gear),
-            int(self.speed),
-            int(-self.steer),
-            int(self.brake),
-            int(self.state.alive),
+            self.gear,
+            self.speed,
+            self.steer,
+            self.brake,
+            self.state.alive,
         )
 
         return self.state
 
     def close(self):
-        """
-        Closes connection to ERP42
+        """Closes connection to ERP42
 
         Stops the vehicle to prevent accidents wait for a full cylcle (20ms)
         for the command to propagate then close the serial port

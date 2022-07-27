@@ -19,7 +19,7 @@ class Node:
         self.pub = rospy.Publisher("erp42_status", DiagnosticStatus, queue_size=1)
 
     def callback(self, msg):
-        self.erp.set_speed(msg.speed)
+        self.erp.set_vel(msg.speed)
         self.erp.set_steer(msg.steering_angle)
         self.erp.set_accel(msg.acceleration)
 
@@ -30,6 +30,11 @@ class Node:
         status["auto_mode"] = self.erp.get_auto_mode(state)
         status["e_stop"] = self.erp.get_e_stop(state)
         status["gear"] = self.erp.get_gear(state)
+        status["speed"] = self.erp.get_vel(state, unit="km/h")
+        status["steer"] = self.erp.get_steer(state, unit="deg")
+        status["brake"] = state.brake
+        status["alive"] = state.alive
+        status["enc"] = state.enc
 
         values = []
         for key in status:

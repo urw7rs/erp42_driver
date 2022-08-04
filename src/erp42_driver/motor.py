@@ -220,11 +220,13 @@ class ERP42Driver:
         """
 
         if unit == "rad":
-            self.steer = math.degrees(angle)
-        elif unit == "deg":
-            self.steer = angle
-        else:
+            angle = math.degrees(angle)
+        elif unit != "deg":
             raise NotImplementedError
+
+        assert angle > -2000 / 71 and angle < 2000 / 71, "steering angle out of range"
+
+        self.steer = angle
 
     def get_accel(self):
         raise NotImplementedError

@@ -82,6 +82,15 @@ class ERP42Serial:
         else:
             alive = 0
 
+        speed = int(speed * 10)  # actual speed (KPH) * 10
+        steer = -int(steer * 71)  # negative of actual steering dgree (dgree) * 71
+
+        assert gear in [0, 1, 2]
+        assert speed >= 0 and speed <= 200
+        assert steer >= -2000 and steer <= 2000
+        assert brake >= 0 and brake <= 200
+        assert alive >= 0 and alive <= 255
+
         self.port.write(
             struct.pack(
                 ">BBBBBBhhBBBB",
@@ -91,8 +100,8 @@ class ERP42Serial:
                 0x01,  # Auto Mode
                 0x00,  # E-Stop Off
                 gear,
-                int(speed * 10),  # actual speed (KPH) * 10
-                -int(steer * 71),  # negative of actual steering dgree (dgree) * 71
+                speed,
+                steer,
                 brake,
                 alive,
                 0x0D,

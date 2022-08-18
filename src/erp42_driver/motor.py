@@ -171,15 +171,16 @@ class ERP42Driver:
 
         # convert velocity to speed and gear
         speed = vel
-        if speed < 0:
-            speed = -speed
-            gear = REVERSE
 
         if speed > 0:
             gear = FORWARD
 
         if speed == 0:
             gear = NEUTRAL
+
+        if speed < 0:
+            speed = -speed
+            gear = REVERSE
 
         # set speed after gear so set_gear overwrites speed if gear is invalid
         self.speed = speed

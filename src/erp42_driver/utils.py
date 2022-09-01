@@ -34,9 +34,9 @@ class ERP42Serial:
 
         line = self.port.readline()
 
-        # return None if length doesn't match
         if len(line) != 18:
-            logging.warning("Read packet is invalid, skipping read: %s", line)
+            line_as_hex = ":".join("{:02x}".format(ord(c)) for c in line)
+            logging.warning("Read packet is invalid, skipping read: %s", line_as_hex)
             valid = False
 
             data = [0] * 8

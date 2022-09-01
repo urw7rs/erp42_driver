@@ -35,18 +35,17 @@ class ERP42Serial:
         line = self.port.readline()
 
         if len(line) != 18:
-            line_as_hex = ":".join("{:02x}".format(ord(c)) for c in line)
-            logging.warning("Read packet is invalid, skipping read: %s", line_as_hex)
             valid = False
 
-            data = [0] * 8
+            line_as_hex = ":".join("{:02x}".format(ord(c)) for c in line)
+            logging.warning("Read packet is invalid, skipping read: %s", line_as_hex)
         else:
             valid = True
 
-            data = struct.unpack(
-                "<BBBhhBiB",
-                line[3:16],
-            )
+        data = struct.unpack(
+            "<BBBhhBiB",
+            line[3:16],
+        )
 
         auto_mode, e_stop, gear, speed, steer, brake, enc, alive = data
 

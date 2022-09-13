@@ -16,14 +16,14 @@ class Node:
 
         rospy.Subscriber("/ackermann_cmd", AckermannDrive, self.callback)
 
-        self.pub = rospy.Publisher("erp42_status", DiagnosticStatus, queue_size=1)
+        self.pub = rospy.Publisher("erp42_status", DiagnosticStatus, queue_size=10)
 
     def callback(self, msg):
         self.erp.set_vel(msg.speed)
-        self.erp.set_steer(msg.steering_angle)
+        self.erp.set_steer(msg.steering_angle, unit="deg")
         self.erp.set_accel(msg.acceleration)
 
-    def run(self):
+    def sync(self):
         state = self.erp.sync()
         status = state._asdict()
 
@@ -57,20 +57,23 @@ if __name__ == "__main__":
     rospy.init_node("erp42_driver", log_level=rospy.DEBUG)
     rospy.loginfo("ERP42 driver Node")
 
+    node = None
+
     while not rospy.is_shutdown():
         port_name = rospy.get_param("~port", "/dev/ttyUSB0")
         rospy.loginfo("Connecting to %s" % (port_name))
 
         try:
             node = Node(port_name)
+            rospy.loginfo("Connected to %s" % (port_name))
             break
         except SerialException as e:
             rospy.loginfo("Serial exception: %s" % (e))
 
         rospy.sleep(0.5)
 
-    rospy.loginfo("Connected to %s" % (port_name))
+    if node is not None:
+        while not rospy.is_shutdown():
+            node.sync()
 
-    # node.run() blocks until ERP42 is ready
-    while not rospy.is_shutdown():
-        node.run()
+        node.stop()

@@ -20,8 +20,11 @@ class ERP42Serial:
 
     """
 
-    def __init__(self, port_name, baud):
-        self.port = Serial(port_name, baudrate=baud, timeout=1.0, write_timeout=1.0)
+    def __init__(self, port_name, baud=115200):
+        self.port = Serial(port_name, baudrate=baud, timeout=0.5, write_timeout=0.5)
+        self.port.readline()
+
+        self.prev_data = None
 
     def read(self):
         """Reads one data packet from ERP42 via uart
@@ -32,20 +35,20 @@ class ERP42Serial:
                 to false if read packet isn't valid
         """
 
-        line = self.port.readline()
+        buffer = self.port.read(18)
+        valid = self._check(buffer)
 
-        if len(line) != 18:
-            valid = False
-
-            line_as_hex = ":".join("{:02x}".format(ord(c)) for c in line)
-            logging.warning("Read packet is invalid, skipping read: %s", line_as_hex)
+        if valid:
+            data = struct.unpack(
+                "<BBBhhBiB",
+                buffer[3:16],
+            )
         else:
-            valid = True
-
-        data = struct.unpack(
-            "<BBBhhBiB",
-            line[3:16],
-        )
+            if self.prev_data is not None:
+                data = self.prev_data
+            else:
+                data = [0] * 8
+                data[5] = 1
 
         auto_mode, e_stop, gear, speed, steer, brake, enc, alive = data
 
@@ -58,9 +61,25 @@ class ERP42Serial:
             brake=brake,
             enc=enc,
             alive=alive,
-            raw=line,
+            raw=buffer,
             valid=valid,
         )
+
+    def _check(self, buffer):
+        valid = True
+
+        if buffer[:3] != "STX":
+            valid = False
+        if len(buffer) != 18:
+            valid = False
+        if buffer[-2:] != "\r\n":
+            valid = False
+
+        if valid is False:
+            line_as_hex = ":".join("{:02x}".format(ord(c)) for c in buffer)
+            logging.warning("Read packet is invalid, skipping read: %s", line_as_hex)
+
+        return valid
 
     def write(self, gear, speed, steer, brake, alive):
         """Writes gear, speed, steer, brake, alive value to ERP42
@@ -86,8 +105,8 @@ class ERP42Serial:
 
         assert gear in [0, 1, 2]
         assert speed >= 0 and speed <= 200
-        assert steer >= -2000 and steer <= 2000
-        assert brake >= 0 and brake <= 200
+        assert steer >= -2000 and steer <= 2000, str(steer)
+        assert brake >= 1 and brake <= 200
         assert alive >= 0 and alive <= 255
 
         self.port.write(

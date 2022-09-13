@@ -1,5 +1,4 @@
 import math
-import time
 
 from erp42_driver.utils import ERP42Serial
 
@@ -300,5 +299,4 @@ class ERP42Driver:
         """
 
         self.stop()
-        time.sleep(0.2)
         self.port.close()
